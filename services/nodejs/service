@@ -1,0 +1,254 @@
+#!/bin/bash
+#==============================================================================
+# Title:            NodeJS (service)
+# Description:      Will install the selected NodeJS packages on Linux OS including
+#                   comying the defined application code to run.
+# Copyright:        2016 Cisco Systems
+#
+# Author:          	Rob Edwards (robedwa/@clijockey)
+# Date:             13/11/16 (updated 18/11/16)
+# Version:          0.7
+# Dependencies:     CentOS6.x
+# Parameters:       (Name)                  (Type)          (values)
+#                   NodejsAppRuntime        list            5.x, 6.x, 7.x
+#                   NodejsAppPackage        string
+#                   ENABLE_PROXY            list            Enables,Disabled
+#                   PROXY                   string          e.g. http://proxy.esl.cisco.com:80/
+#                   NO_PROXY_HOSTS          string          e.g. .cisco.com
+#                   NO_PROXY_RANGE          string          e.g. 10.52.208 10.51.8
+#
+#                   NODEJS_DEPLOY_PATH      string          e.g. http://server/dir/file.zip
+#                   NodejsMainEntry         string          e.g. server.js
+#
+# License:          Copying and distribution of this file, with or without modification,
+#                   are permitted in any medium without royalty provided the copyright
+#                   notice, original author and this notice are preserved. This file is
+#                   offered as-is, without any warranty.
+#==============================================================================
+
+SVCNAME=nodejs
+NODEJS_DEPLOY_PATH=/opt/node
+
+# --------- Load CloudCenter Libraries and logging -------------
+exec > >(tee -a /usr/local/osmosix/logs/service.log) 2>&1
+
+OSSVC_HOME=/usr/local/osmosix/service
+. /utils.sh
+. /usr/local/osmosix/etc/.osmosix.sh
+. /usr/local/osmosix/etc/userenv
+. $OSSVC_HOME/utils/cfgutil.sh
+. $OSSVC_HOME/utils/install_util.sh
+. $OSSVC_HOME/utils/os_info_util.sh
+
+log() {
+    # Setup logging
+	if [ -n "$USE_SERVICE_LOG"  -a "$USE_SERVICE_LOG" == "true" ];then
+	    echo "$*"
+	else
+		logger -t "OSMOSIX" "[$SVCNAME] $*"
+	fi
+}
+
+#--------------------- Load End --------------------
+
+
+
+#---------- Environment Setup Functions --------------------
+proxy_setup() {
+    # Setup proxy configuration if deployment is sat behind a corporate proxy.
+    # This section will setup the proxy if enabled in the app profile.
+    log '[ENV_SETUP] Setting up proxy for Internet access'
+    export PROXY=$PROXY
+    export proxy=$PROXY
+    export http_proxy=$PROXY
+    export https_proxy=$PROXY
+    export ftp_proxy=$PROXY
+    export HTTP_PROXY=$PROXY
+    export HTTPS_PROXY=$PROXY
+    export FTP_PROXY=$PROXY
+    if [[ ! -z $NO_PROXY_HOSTS ]]; then
+       # In case this was passed as a comma separated input, remove the commas
+       NO_PROXY_HOSTS=$(echo $NO_PROXY_HOSTS | sed 's/,/ /g')
+       no_proxy=$(echo $NO_PROXY_HOSTS | sed 's/ /,/g')
+    fi
+    if [[ ! -z $NO_PROXY_RANGE ]]; then
+       # In case this was passed as a comma separated input, remove the commas
+       NO_PROXY_RANGE=$(echo $NO_PROXY_RANGE | sed 's/,/ /g')
+       for ip in $NO_PROXY_RANGE; do
+           # Sanitise IP address (removing trailing .)
+           ip=$(echo $ip | sed 's/\.$//')
+           no_proxy="$no_proxy,$(echo $ip.{0..255} | sed 's/ /,/g')"
+       done
+       export no_proxy
+       export NO_PROXY=$no_proxy
+    fi
+    # Variables to add to user env
+    proxy_vars="proxy http_proxy https_proxy ftp_proxy no_proxy PROXY HTTP_PROXY HTTPS_PROXY FTP_PROXY NO_PROXY"
+    for env in $proxy_vars; do
+       if [[ ! -z $(eval echo \$$env) ]]; then
+           echo export $env=\"$(eval echo \$$env)\" >> /usr/local/osmosix/etc/userenv
+       fi
+    done
+    # Source back changes
+    . /usr/local/osmosix/etc/userenv
+    unset proxy_vars
+
+    echo "proxy=http://proxy.esl.cisco.com:80/" >> /etc/yum.conf
+}
+
+log '[ENV_SETUP] Detecting OS and setting OS specifc variables'
+if [[ -x /usr/bin/apt-get ]]; then
+	FLAVOUR="debian"
+	PACKAGES="curl unzip"
+	PKG_INSTALL="apt-get -y install"
+	PKG_UPDATE="apt-get -y update"
+	PKG_UPGRADE="apt-get -y upgrade"
+elif [[ -x /usr/bin/yum ]]; then
+	FLAVOUR="redhat"
+	PACKAGES="curl unzip"
+	PKG_INSTALL="yum -y install"
+	PKG_UPDATE="yum -y update"
+	PKG_UPGRADE=""
+    #RH_VERSION=`rpm -qa \*-release|egrep 'centos|redhat'|cut -d"-" -f3`
+else
+	log [ERROR] Cannot detect operating system
+	# Error out - can't detect OS!
+	exit 1
+fi
+
+#---------- Environment Setup Functions End ----------------
+
+#---------- C3 lifecycle Functions -------------------------
+install() {
+    log '[INSTALL] Checking if proxy is required'
+    if [[ "$ENABLE_PROXY" = Enabled ]] && [[ ! -z $PROXY ]]; then
+        log '[INSTALL] Proxy enabled detected! Configuring ....'
+        proxy_setup
+    fi
+
+    log '[INSTALL] Requesting OS upgrade'
+    upgrade
+    # Install needed packages
+    log "[INSTALL] Installing required packages with command $PKG_INSTALL $PACKAGES"
+    $PKG_INSTALL $PACKAGES
+
+    if (( $? > 0 )); then
+		log '[ERROR] Package installation failed'
+		exit 1
+	fi
+
+    #yum install -y nodejs npm --enablerepo=epel
+
+    if [[ "$FLAVOUR" = debian ]]; then
+		log '[INSTALL] Running debian-flavour specific commands'
+		# Enable wsgi module and disable default vhost
+        curl -sL https://deb.nodesource.com/setup_$NodejsAppRuntime | sudo -E bash -
+		apt-get -y install nodejs build-essential
+    elif [[ "$FLAVOUR" = redhat ]]; then
+        log '[INSTALL] Running redhat-flavour specific commands'
+        curl -sL https://rpm.nodesource.com/setup_$NodejsAppRuntime | bash -
+        yum -y install epel-release
+    	yum install -y nodejs gcc-c++ make
+
+	fi
+    curl -L https://npmjs.org/install.sh | sh
+
+    # Dirty hack for troubleshooting
+    echo -e 'cliqruser\tALL=(ALL:ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+    log '[INSTALL] Install finished'
+}
+
+deploy() {
+    log '[DEPLOY] Deploying the application code'
+    if [ -z $NodejsAppPackage ]; then
+		echo "Missing Nodejs App Package, exit now"
+		exit 1
+	fi
+
+	if [ -d $NODEJS_DEPLOY_PATH ]; then
+		rm -rf $NODEJS_DEPLOY_PATH
+	fi
+	mkdir -p $NODEJS_DEPLOY_PATH
+	cd $NODEJS_DEPLOY_PATH
+    wget $NodejsAppPackage -O $NODEJS_DEPLOY_PATH/app.zip
+	unzip app.zip
+	npm install
+}
+
+configure() {
+    log '[CONFIGURE] xx'
+}
+
+start() {
+    log '[START] Starting NodeJS application'
+
+    cd $NODEJS_DEPLOY_PATH
+	node $NodejsMainEntry > /tmp/node.log 2>&1 &
+
+    log '[START] NodeJS Application Started'
+}
+
+stop() {
+    log '[STOP] Stopping/Killing application'
+    kill -INT `ps aux | grep "node $NodejsMainEntry" | grep -v grep | awk '{print $2}'`
+    log '[STOP] Application now stopped'
+}
+#---------- C3 lifecycle Functions End ---------------------
+
+
+case $1 in
+    install)
+        # The install service phase is implemented when the node first comes up.
+        # NOTE: The install phase does not have any environment variables.
+        log "[INSTALL] Installing $SVCNAME"
+        ;;
+    deploy)
+        # Once all nodes are initialized and started, you must specify this action for services that need these files deployed into a particular service at the time of deployment.
+        log "[DEPLOY] Deploying $SVCNAME instalation and configuration settings"
+		install
+		deploy
+        ;;
+    configure)
+        # Modify a configuration based on a requirement – If an application like NginX requires all the IP addresses for each application tier, you can configure this service to perform the related actions.
+        log "[CONFIGURE] Generating $SVCNAME configuration"
+        configure
+        ;;
+    start)
+        # A service start action only occurs when all the nodes in the deployment are up and running.
+        # Some enterprises may have a start.sh script specifically for starting the services. If you have the start.sh file in the /usr/local/osmosix/service directory, this file executes each time the service starts.
+        # When you reboot a service, the IP address may change. This action may need you to reconfigure all connected IP addresses. So you need to call the Configure action and the Start action to complete the lifecycle process.
+        log "[START] Invoking pre-start user script"
+        start
+        ;;
+    stop)
+        # When shutting down the node, you can perform related cleanup actions.
+        log "[STOP] Invoking stop user process"
+        stop
+        ;;
+    restart)
+        # When you restart the system from the UI after shutting it down, you can specify what actions need to be performed.
+        log "[RESTART] Invoking restart"
+        stop
+		start
+		;;
+    reload)
+        # The IP address changes for connected nodes. For example, if any connect node restarts for any reason in a three-tier deployment, you can configure a reload command to internally reload the affected services.
+        log "[RELOAD] Invoking reload"
+        stop
+        start
+        ;;
+    upgrade)
+        # 	When upgrading the deployment, you can identify the dependent factors for each service.
+        log "[UPGRADE] Invoking upgrade"
+		#stop
+		#deploy
+		#start
+		;;
+	cleanup)
+        # When a node is being terminated, you can specify the related clean up command, script, or URL.
+        log "[CLEANUP] Invoking cleanup"
+		;;
+    *)
+        ;;
+esac

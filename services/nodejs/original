@@ -1,0 +1,120 @@
+#!/bin/bash
+
+# NODE.JS Service
+
+exec > >(tee -a /usr/local/osmosix/logs/service.log) 2>&1
+
+SVCNAME=nodejs
+OSSVC_HOME=/usr/local/osmosix/service
+SVCHOME="$OSSVC_HOME/$SVCNAME"
+
+. /usr/local/osmosix/etc/userenv
+. $OSSVC_HOME/utils/cfgutil.sh
+. $OSSVC_HOME/utils/os_info_util.sh
+. $OSSVC_HOME/utils/install_util.sh
+
+NODEJS_DEPLOY_PATH=/opt/node
+
+installNodejs() {
+
+    echo "Installing nodejs on $os"
+
+    # fix hostname config
+    echo "127.0.0.1 `hostname`" >> /etc/hosts
+
+    echo "Requested version: $cliqrNodejsAppRuntime"
+
+    ###########################################################
+    # Reference: https://github.com/nodesource/distributions
+    ###########################################################
+    cd $OSSVC_HOME/$SVCNAME/
+    if [ "$os" == "Ubuntu" ]; the
+    	curl -sL https://deb.nodesource.com/setup_$cliqrNodejsAppRuntime | sudo -E bash -
+		apt-get -y install nodejs build-essential
+    elif ([ "$os" == "CentOS" ] || [ "$os" == "RHEL" ]); then
+    	curl -sL https://rpm.nodesource.com/setup_$cliqrNodejsAppRuntime | bash -
+		yum install -y nodejs gcc-c++ make
+    fi
+    curl -L https://npmjs.org/install.sh | sh
+
+    exitCode=$?
+    [ $exitCode -ne 0 ] && exit $exitCode
+    echo "Install finished"
+}
+
+deployNodejsApp() {
+	if [ -z $cliqrNodejsAppPackage ]; then
+		echo "Missing Nodejs App Package, exit now"
+		exit 1
+	fi
+	echo "Deploying nodejs package"
+	if [ -d $NODEJS_DEPLOY_PATH ]; then
+		rm -rf $NODEJS_DEPLOY_PATH
+	fi
+	mkdir -p $NODEJS_DEPLOY_PATH
+	cd $NODEJS_DEPLOY_PATH
+	cp $cliqrNodejsAppPackage app.zip
+	unzip app.zip
+	npm install
+}
+
+configureNodejs() {
+    echo "Configuring nodejs"
+    echo "Configured nodejs"
+}
+
+startNodejs() {
+    echo "Starting nodejs app"
+
+    cd $NODEJS_DEPLOY_PATH
+	node $cliqrNodejsMainEntry > /tmp/node.log 2>&1 &
+
+	# Run restore script in case of migration
+	if [ "$appMigrating" == "true" ]; then
+        runMigrationRestoreScript
+    fi
+
+    echo "Nodejs app started"
+}
+
+stopNodejs() {
+    echo "Stopping nodejs app"
+    kill -INT `ps aux | grep "node $cliqrNodejsMainEntry" | grep -v grep | awk '{print $2}'`
+    echo "nodejs app stopped"
+}
+
+
+case $1 in
+    install)
+        ;;
+    deploy)
+		installNodejs
+		deployNodejsApp
+        ;;
+    configure)
+        configureNodejs
+        ;;
+    start)
+        startNodejs
+        ;;
+    stop)
+        stopNodejs
+        ;;
+    restart)
+		stopNodejs
+		startNodejs
+		;;
+    reload)
+        stopNodejs
+        startNodejs
+        ;;
+    upgrade)
+		stopNodejs
+		deployNodejsApp
+		startNodejs
+		;;
+	cleanup)
+		;;
+    *)
+        ;;
+esac
