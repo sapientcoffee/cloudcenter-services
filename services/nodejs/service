@@ -140,12 +140,12 @@ install() {
     if [[ "$FLAVOUR" = debian ]]; then
 		log '[INSTALL] Running debian-flavour specific commands'
 		# Enable wsgi module and disable default vhost
-        curl -sL https://deb.nodesource.com/setup_7.x | sudo -E bash -
+        curl -sL https://deb.nodesource.com/setup_$NodejsAppRuntime | sudo -E bash -
 		apt-get -y install nodejs build-essential
     elif [[ "$FLAVOUR" = redhat ]]; then
         log '[INSTALL] Running redhat-flavour specific commands'
         #curl -sL https://rpm.nodesource.com/setup_$NodejsAppRuntime | bash -
-        curl -sL https://rpm.nodesource.com/setup_7.x | bash -
+        curl -sL https://rpm.nodesource.com/setup_$NodejsAppRuntime | bash -
         yum -y install epel-release
     	yum install -y nodejs gcc-c++ make
 
