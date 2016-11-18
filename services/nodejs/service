@@ -4,7 +4,6 @@
 # Description:      Will install the selected NodeJS packages on Linux OS including
 #                   comying the defined application code to run.
 # Copyright:        2016 Cisco Systems
-#
 # Author:          	Rob Edwards (robedwa/@clijockey)
 # Date:             13/11/16 (updated 18/11/16)
 # Version:          0.7
@@ -16,11 +15,11 @@
 #                   PROXY                   string          e.g. http://proxy.esl.cisco.com:80/
 #                   NO_PROXY_HOSTS          string          e.g. .cisco.com
 #                   NO_PROXY_RANGE          string          e.g. 10.52.208 10.51.8
-#
 #                   NODEJS_DEPLOY_PATH      string          e.g. http://server/dir/file.zip
 #                   NodejsMainEntry         string          e.g. server.js
 #
-# License:          Copying and distribution of this file, with or without modification,
+# License:          Copying and distribution
+ of this file, with or without modification,
 #                   are permitted in any medium without royalty provided the copyright
 #                   notice, original author and this notice are preserved. This file is
 #                   offered as-is, without any warranty.
@@ -93,7 +92,7 @@ proxy_setup() {
     . /usr/local/osmosix/etc/userenv
     unset proxy_vars
 
-    echo "proxy=http://proxy.esl.cisco.com:80/" >> /etc/yum.conf
+    echo "proxy=$PROXY" >> /etc/yum.conf
 }
 
 log '[ENV_SETUP] Detecting OS and setting OS specifc variables'
@@ -142,11 +141,12 @@ install() {
     if [[ "$FLAVOUR" = debian ]]; then
 		log '[INSTALL] Running debian-flavour specific commands'
 		# Enable wsgi module and disable default vhost
-        curl -sL https://deb.nodesource.com/setup_$NodejsAppRuntime | sudo -E bash -
+        curl -sL https://deb.nodesource.com/setup_7.x | sudo -E bash -
 		apt-get -y install nodejs build-essential
     elif [[ "$FLAVOUR" = redhat ]]; then
         log '[INSTALL] Running redhat-flavour specific commands'
-        curl -sL https://rpm.nodesource.com/setup_$NodejsAppRuntime | bash -
+        #curl -sL https://rpm.nodesource.com/setup_$NodejsAppRuntime | bash -
+        curl -sL https://rpm.nodesource.com/setup_7.x | bash -
         yum -y install epel-release
     	yum install -y nodejs gcc-c++ make
 
@@ -185,13 +185,15 @@ start() {
 
     cd $NODEJS_DEPLOY_PATH
 	node $NodejsMainEntry > /tmp/node.log 2>&1 &
+    echo $!>pid
 
     log '[START] NodeJS Application Started'
 }
 
 stop() {
     log '[STOP] Stopping/Killing application'
-    kill -INT `ps aux | grep "node $NodejsMainEntry" | grep -v grep | awk '{print $2}'`
+    #kill -INT `ps aux | grep "node $NodejsMainEntry" | grep -v grep | awk '{print $2}'`
+    kill -INT $(cat pid)
     log '[STOP] Application now stopped'
 }
 #---------- C3 lifecycle Functions End ---------------------
