@@ -1,55 +1,76 @@
 #!/bin/bash
-
 #==============================================================================
-# Title:                Spark Message (service)
-# Description:          This is an external service for Cloud Center to post a
-#                       message to a Spark room.
-#
-# Author:          		Rob Edwards (robedwa/@clijockey)
-# Date:                 01/11/16
-# Version:              0.1
+# Title:            Spark Post Message ( External service)
+# Description:      This is an external service for Cloud Center to post a
+#                   message to a Spark room.
+# Copyright:        2016 Cisco Systems
+# Author:          	Rob Edwards (robedwa/@clijockey)
+# Date:             01/11/16 (updated 18/11/16)
+# Version:          0.2
 # Dependencies:
-# Limitations/issues:   Early days of the service
-#                       Make proxy settings optional
+# Parameters:       (Name)                  (Type)          (values)
+#                   Authorization           string          Bearer YzNi...
+#                   roomid                  string          Y2lzY29zcGFy.......
+#                   PROXY                   string          e.g. http://proxy.esl.cisco.com:80/
+# License:          Copying and distribution of this file, with or without modification,
+#                   are permitted in any medium without royalty provided the copyright
+#                   notice, original author and this notice are preserved. This file is
+#                   offered as-is, without any warranty.
 #==============================================================================
-
-
-. /utils.sh
-
 
 SVCNAME="spark"
 
+# --------- Load CloudCenter Libraries and logging -------------
+. /utils.sh
+#--------------------- Load End --------------------
+
+
+#---------- C3 lifecycle Functions -------------------------
 postMessage(){
     print_log "Posting spark message!"
-    print_log "Proxy set: $proxy"
 
-    ## Message - Create (Lab)
-    #
-    curl --proxy $proxy \
-        -X "POST" "https://api.ciscospark.com/v1/messages" \
-        -H "Authorization: $Authorization" \
-        -H "Content-Type: application/json" \
-        -d $"{ \"roomId\": \"$roomId\",
-            \"markdown\": \"$1\" }"
 
-    print_log "Posted spark message!"
+    if [[ ! -z $PROXY ]]; then
+        print_log "[POST_MESSAGE]Proxy set: $proxy"
+        print_log '[POST_MESSAGE] Proxy parameter detected! Configuring ....'
+        ## Message - Create
+        curl --proxy $proxy \
+            -X "POST" "https://api.ciscospark.com/v1/messages" \
+            -H "Authorization: $Authorization" \
+            -H "Content-Type: application/json" \
+            -d $"{ \"roomId\": \"$roomId\",
+                \"markdown\": \"$1\" }"
+
+        print_log "[POST_MESSAGE] Posted spark message with proxy!"
+    else
+        ## Message - Create
+        curl -X "POST" "https://api.ciscospark.com/v1/messages" \
+            -H "Authorization: $Authorization" \
+            -H "Content-Type: application/json" \
+            -d $"{ \"roomId\": \"$roomId\",
+                \"markdown\": \"$1\" }"
+
+        print_log "[POST_MESSAGE] Posted spark message!"
+    fi
 }
+#---------- C3 lifecycle Functions End ---------------------
+
 
 case $1 in
     update)
-        postMessage "Application [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **updated**"
+        postMessage "Application in CloudCenter [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **updated**"
         ;;
 	start)
-		postMessage "Application [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **started**"
+		postMessage "Application in CloudCenter [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **started**"
 		;;
 	stop)
-        postMessage "Application [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **stopped**"
+        postMessage "Application in CloudCenter [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **stopped**"
 		;;
 	suspend)
-        postMessage "Application [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **suspend**"
+        postMessage "Application in CloudCenter [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **suspend**"
 		;;
 	resume)
-        postMessage "Application [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **resumed**"
+        postMessage "Application in CloudCenter [$parentJobName](https://cloud-center.ukidcv.cisco.com/#job/runs/$parentJobId) has been **resumed**"
 		;;
 	*)
 		echo "unknown command"
