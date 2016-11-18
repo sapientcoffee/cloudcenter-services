@@ -18,8 +18,7 @@
 #                   NODEJS_DEPLOY_PATH      string          e.g. http://server/dir/file.zip
 #                   NodejsMainEntry         string          e.g. server.js
 #
-# License:          Copying and distribution
- of this file, with or without modification,
+# License:          Copying and distribution of this file, with or without modification,
 #                   are permitted in any medium without royalty provided the copyright
 #                   notice, original author and this notice are preserved. This file is
 #                   offered as-is, without any warranty.
