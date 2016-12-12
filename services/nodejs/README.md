@@ -14,7 +14,7 @@ You should zip your NodeJS code/scripts and any dependencies up, e.g.
 ```
 zip application.zip application.js
 ```
-An example NodeJS application component that I used for the development of this service makes up part of the ['Mrs Miggins Pie Voting'](xxx) application I have previously used in demos. It is based on the [container end-to-end example](https://github.com/clijockey/miggins-vote-app).
+An example NodeJS application component that I used for the development of this service makes up part of the ['Mrs Miggins Pie Voting'](https://github.com/clijockey/miggins-vote-app) application I have previously used in demos. The specific NodeJS component is [here](https://github.com/clijockey/miggins-vote-app-result).
 
 You can then make this available to the service by setting the following custom parameters:
 
