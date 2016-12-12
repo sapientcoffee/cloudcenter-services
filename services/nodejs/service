@@ -9,7 +9,7 @@
 # Version:          0.7
 # Dependencies:     CentOS6.x
 # Parameters:       (Name)                  (Type)          (values)
-#                   NodejsAppRuntime        list            5.x, 6.x, 7.x
+#                   NodejsAppRuntime        list            5.x,6.x,7.x
 #                   NodejsAppPackage        string
 #                   ENABLE_PROXY            list            Enables,Disabled
 #                   PROXY                   string          e.g. http://proxy.esl.cisco.com:80/
@@ -152,7 +152,7 @@ install() {
 	fi
     curl -L https://npmjs.org/install.sh | sh
 
-    # Dirty hack for troubleshooting
+    # Hack for troubleshooting
     echo -e 'cliqruser\tALL=(ALL:ALL) NOPASSWD: ALL' >> /etc/sudoers
 
     log '[INSTALL] Install finished'
